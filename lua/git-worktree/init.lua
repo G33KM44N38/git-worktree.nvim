@@ -323,8 +323,10 @@ local function create_worktree(path, branch, upstream, found_branch)
 
     -- TODO: How to configure origin???  Should upstream ever be the push
     -- destination?
+    -- FIX: Removed 'path' argument - it was causing "receives from more than one src" error
+    -- The path should not be in git push arguments, only branch name
     local set_push_cmd = 'git'
-    local set_push_args = {'push', "--set-upstream", upstream,  branch, path}
+    local set_push_args = {'push', "--set-upstream", upstream, branch}
     local set_push  = Job:new({
         command = set_push_cmd,
         args = set_push_args,
