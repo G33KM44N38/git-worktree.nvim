@@ -461,7 +461,7 @@ M.delete_worktree = function(path, force, opts)
                 opts.on_failure(e)
             end
 
-            failure(cmd, vim.loop.cwd())(e)
+            failure("delete_worktree", cmd, path, opts.on_failure ~= nil)(e)
         end)
         delete:start()
     end)

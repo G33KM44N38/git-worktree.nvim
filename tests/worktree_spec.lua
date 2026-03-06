@@ -15,6 +15,24 @@ local in_repo_from_origin_2_similar_named_worktrees = harness.in_repo_from_origi
 local check_git_worktree_exists = harness.check_git_worktree_exists
 local check_branch_upstream = harness.check_branch_upstream
 
+local get_upvalue_by_name = function(fn, target_name)
+    local index = 1
+
+    while true do
+        local name, value = debug.getupvalue(fn, index)
+
+        if name == nil then
+            return nil
+        end
+
+        if name == target_name then
+            return value
+        end
+
+        index = index + 1
+    end
+end
+
 describe('git-worktree', function()
 
     local completed_create = false
@@ -824,6 +842,48 @@ describe('git-worktree', function()
 
             -- Check to make sure directory was not switched
             assert.are.same(vim.loop.cwd(), git_worktree:get_root())
+
+        end))
+
+        it('from a repo with one dirty worktree, reports a soft delete failure with the target path',
+            in_repo_from_origin_1_worktree(function()
+
+            local random_str = git_worktree.get_root():sub(git_worktree.get_root():len()-4)
+            local path = "../git_worktree_test_repo_featB_"..random_str
+            local absolute_path = "/tmp/git_worktree_test_repo_featB_"..random_str
+            local status = get_upvalue_by_name(git_worktree.delete_worktree, "status")
+            local original_status = status.status
+            local status_messages = {}
+            local failure_result = nil
+
+            status.status = function(self, msg)
+                table.insert(status_messages, msg)
+                return original_status(self, msg)
+            end
+
+            vim.fn.writefile({ "dirty" }, absolute_path .. "/dirty.txt")
+
+            git_worktree.delete_worktree(path, false, {
+                on_failure = function(e)
+                    failure_result = e
+                end
+            })
+
+            vim.fn.wait(
+            10000,
+            function()
+                return failure_result ~= nil
+            end,
+            1000
+            )
+
+            status.status = original_status
+
+            assert.is_not_nil(failure_result)
+            assert.are.same(1, vim.fn.filereadable(absolute_path .. "/dirty.txt"))
+            assert.False(completed_delete)
+            assert.is_not_nil(string.find(status_messages[#status_messages], "delete_worktree Failed: PATH " .. path, 1, true))
+            assert.is_not_nil(string.find(status_messages[#status_messages], path, 1, true))
 
         end))
 
